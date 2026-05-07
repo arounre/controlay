@@ -1,0 +1,143 @@
+name: Windows Build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch_name }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch_name: x86_64
+          - target: aarch64-pc-windows-msvc
+            arch_name: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-binstall
+        if: matrix.arch_name == 'x86_64'
+        uses: taiki-e/install-action@cargo-binstall
+
+      - name: Install cargo-packager
+        if: matrix.arch_name == 'x86_64'
+        run: cargo binstall -y cargo-packager
+
+      - name: Get Project Name
+        shell: bash
+        run: echo "PROJECT_NAME=$(cargo read-manifest | jq -r .name)" >> $GITHUB_ENV
+
+      - name: Build Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create Installers
+        if: matrix.arch_name == 'x86_64'
+        run: cargo packager --release --target ${{ matrix.target }}
+
+      - name: Process Artifacts
+        shell: bash
+        run: |
+          # Define standard names
+          RAW_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}.exe"
+          SETUP_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}-setup.exe"
+          MSI_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}.msi"
+
+          # A. Handle Raw Binary (Always exists)
+          cp "target/${{ matrix.target }}/release/${PROJECT_NAME}.exe" "./$RAW_NAME"
+
+          # B. Handle Installers (Only exists for x86_64)
+          find target -name "*.msi" -exec cp {} "./$MSI_NAME" \;
+          find target -name "*setup.exe" -exec cp {} "./$SETUP_NAME" \;
+
+          # Debug check
+          ls -lh *-${{ matrix.arch_name }}*.exe *.msi || true
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-${{ matrix.arch_name }}
+          path: |
+            ${{ env.PROJECT_NAME }}-*-${{ matrix.arch_name }}.exe
+            ${{ env.PROJECT_NAME }}-*-${{ matrix.arch_name }}-setup.exe
+            ${{ env.PROJECT_NAME }}-*-${{ matrix.arch_name }}.msi
+          retention-days: 1
+          if-no-files-found: warn
+
+  release-and-scan:
+    name: Release & VirusTotal
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Inspect Downloaded Files
+        run: ls -R dist
+
+      - name: Attest Release Artifacts
+        if: github.event.repository.private == false
+        uses: actions/attest@v4
+        with:
+          subject-path: "dist/*"
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: "dist/*"
+          allowUpdates: true
+          generateReleaseNotes: true
+          makeLatest: true
+
+      - name: VirusTotal Scan
+        id: vt
+        uses: cssnr/virustotal-action@v1
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          file_globs: |
+            dist/*.exe
+            dist/*.msi
+          update_release: false
+
+      - name: Append Results to Release Body
+        shell: bash
+        run: |
+          echo '${{ steps.vt.outputs.json }}' > vt_results.json
+
+          echo "" > vt_table.md
+          echo "### VirusTotal Security Report" >> vt_table.md
+          echo "| File | Report |" >> vt_table.md
+          echo "| :--- | :--- |" >> vt_table.md
+
+          jq -r '.[] | "| `\(.name)` | [View Report](\(.link)) |"' vt_results.json >> vt_table.md
+
+          gh release view ${{ github.ref_name }} -R ${{ github.repository }} --json body -q .body > existing_notes.md
+
+          cat existing_notes.md > final_notes.md
+          echo "" >> final_notes.md
+          cat vt_table.md >> final_notes.md
+
+          gh release edit ${{ github.ref_name }} -R ${{ github.repository }} --notes-file final_notes.md

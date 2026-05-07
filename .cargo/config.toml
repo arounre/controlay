@@ -1,0 +1,2 @@
+[alias]
+update-thirdparty =["about", "generate", "-o", "thirdparty.md", "about.hbs"]
