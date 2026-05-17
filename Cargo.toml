@@ -1,6 +1,6 @@
 [package]
 name = "controlay"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 authors = ["arounre"]
 description = "Receiver for Controlay: Emulate game controllers on PC using your Android phone as a wireless bridge."
