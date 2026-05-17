@@ -1,351 +1,392 @@
-use crate::app::{AppInfo, EventProxy, LogicCommand, ReceiverState, UiUpdate};
-use crate::config::{ControllerType, LogicSettings, ProfileLogic};
-use crate::discovery;
-use crate::protocol::{PacketType, parse_ds4_state, parse_x360_state};
-use anyhow::{Context, Result, anyhow};
-use std::net::{SocketAddr, UdpSocket};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{self, Receiver, TryRecvError};
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use local_ip_address::local_ip;
+use anyhow::{Context, Result};
+use tokio::net::UdpSocket;
+use tokio::sync::{broadcast, mpsc, watch};
 use vigem_rust::TargetHandle;
 use vigem_rust::client::Client;
 use vigem_rust::target::{DualShock4, Xbox360};
 
-enum ActiveTarget {
+use crate::config::{AppConfig, ControllerType, RawDeadzone};
+use crate::core::{AppEvent, AppInfo, ReceiverState, ServerCommand};
+use crate::discovery;
+use crate::protocol::{
+    PKT_BATTERY, PKT_STATE, get_empty_ds4_report, get_empty_x360_report, parse_ds4_state,
+    parse_x360_state,
+};
+
+enum TargetHandleEnum {
     Xbox(TargetHandle<Xbox360>),
     Ds4(TargetHandle<DualShock4>),
 }
 
-struct SlotData {
-    target: ActiveTarget,
-    last_packet_time: std::time::Instant,
+struct ActiveTarget {
+    handle: TargetHandleEnum,
+    stop_rumble: Arc<AtomicBool>,
+}
+
+impl Drop for ActiveTarget {
+    fn drop(&mut self) {
+        self.stop_rumble.store(true, Ordering::Relaxed);
+    }
+}
+
+enum SlotMessage {
+    Data { len: usize, buf: [u8; 64] },
+    Disconnect,
+}
+
+pub async fn run_backend(
+    mut cmd_rx: mpsc::Receiver<ServerCommand>,
+    config_rx: watch::Receiver<AppConfig>,
+    event_tx: broadcast::Sender<AppEvent>,
+) {
+    let mut server_task: Option<tokio::task::JoinHandle<()>> = None;
+    let mut current_server_tx: Option<mpsc::Sender<ServerCommand>> = None;
+
+    loop {
+        tokio::select! {
+            cmd_opt = cmd_rx.recv() => {
+                match cmd_opt {
+                    Some(ServerCommand::Start) => {
+                        if server_task.is_none() {
+                            let (tx, rx) = mpsc::channel(10);
+                            current_server_tx = Some(tx);
+
+                            server_task = Some(tokio::spawn(run_server(
+                                config_rx.clone(),
+                                event_tx.clone(),
+                                rx,
+                            )));
+
+                            let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::Starting));
+                        }
+                    }
+                    Some(ServerCommand::Stop) => {
+                        if let Some(task) = server_task.take() {
+                            task.abort();
+                            current_server_tx = None;
+                            let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::Off));
+                            let _ = event_tx.send(AppEvent::Log("Stopped.".into()));
+                        }
+                    }
+                    Some(ServerCommand::DisconnectSlot(slot)) => {
+                        if let Some(tx) = &current_server_tx {
+                            let _ = tx.try_send(ServerCommand::DisconnectSlot(slot));
+                        }
+                    }
+                    None => {
+                        if let Some(task) = server_task.take() {
+                            task.abort();
+                        }
+                        break;
+                    }
+                }
+            }
+            _ = async {
+                if let Some(task) = server_task.as_mut() {
+                    let _ = task.await;
+                } else {
+                    std::future::pending().await
+                }
+            } => {
+                server_task = None;
+                current_server_tx = None;
+            }
+        }
+    }
+}
+
+async fn run_server(
+    config_rx: watch::Receiver<AppConfig>,
+    event_tx: broadcast::Sender<AppEvent>,
+    mut server_cmd_rx: mpsc::Receiver<ServerCommand>,
+) {
+    let vigem_client = match Client::connect() {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            let _ = event_tx.send(AppEvent::MissingDriver);
+            let _ = event_tx.send(AppEvent::Log(format!("ViGEmBus Client failed: {}", e)));
+            let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::Off));
+            return;
+        }
+    };
+
+    let bind_port = {
+        let cfg = config_rx.borrow();
+        if cfg.use_custom_port { cfg.port } else { 0 }
+    };
+    let socket = match UdpSocket::bind(format!("0.0.0.0:{}", bind_port)).await {
+        Ok(s) => Arc::new(s),
+        Err(e) => {
+            let _ = event_tx.send(AppEvent::Log(format!("Failed to bind socket: {}", e)));
+            let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::Off));
+            return;
+        }
+    };
+    let local_port = match socket.local_addr() {
+        Ok(addr) => addr.port(),
+        Err(e) => {
+            let _ = event_tx.send(AppEvent::Log(format!("Failed to get local port: {}", e)));
+            let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::Off));
+            return;
+        }
+    };
+
+    let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::On));
+    let _ = event_tx.send(AppEvent::Log(format!("Listening on port {}", local_port)));
+
+    let (client_ip_tx, client_ip_rx) = watch::channel::<Option<SocketAddr>>(None);
+
+    tokio::spawn(discovery::start_beacon(
+        local_port,
+        config_rx.clone(),
+        client_ip_rx.clone(),
+    ));
+
+    let mut slot_senders = vec![];
+    for slot_id in 0..4 {
+        let (tx, rx) = mpsc::channel::<SlotMessage>(100);
+        slot_senders.push(tx);
+        tokio::spawn(run_controller_actor(
+            slot_id as u8,
+            rx,
+            config_rx.clone(),
+            event_tx.clone(),
+            Arc::clone(&socket),
+            client_ip_rx.clone(),
+            Arc::clone(&vigem_client),
+        ));
+    }
+
+    let mut buf = [0u8; 64];
+
+    let sleep = tokio::time::sleep(Duration::from_secs(3));
+    tokio::pin!(sleep);
+    let mut has_client = false;
+
+    loop {
+        tokio::select! {
+            cmd = server_cmd_rx.recv() => {
+                match cmd {
+                    Some(ServerCommand::DisconnectSlot(s)) => {
+                        let _ = slot_senders[s as usize].try_send(SlotMessage::Disconnect);
+                    }
+                    None => break,
+                    _ => {}
+                }
+            }
+            res = socket.recv_from(&mut buf) => {
+                if let Ok((size, src)) = res {
+                    let current_ip = *client_ip_tx.borrow();
+
+                    if let Some(locked_ip) = current_ip {
+                        if src != locked_ip {
+                            continue;
+                        }
+                    } else {
+                        let _ = client_ip_tx.send(Some(src));
+                        let _ = event_tx.send(AppEvent::Log(format!("Device connected ({})", src.ip())));
+                        has_client = true;
+                    }
+
+                    sleep.as_mut().reset(tokio::time::Instant::now() + Duration::from_secs(3));
+
+                    if size < 2 { continue; }
+                    let slot_idx = buf[1] as usize;
+
+                    if slot_idx < 4 {
+                        let mut payload = [0u8; 64];
+                        payload[..size].copy_from_slice(&buf[..size]);
+
+                        let _ = slot_senders[slot_idx].try_send(SlotMessage::Data {
+                            len: size,
+                            buf: payload
+                        });
+                    }
+                }
+            }
+            _ = &mut sleep, if has_client => {
+                let _ = client_ip_tx.send(None);
+                let _ = event_tx.send(AppEvent::Log("Client connection timed out.".into()));
+                has_client = false;
+            }
+        }
+    }
+}
+
+async fn run_controller_actor(
+    slot_id: u8,
+    mut packet_rx: mpsc::Receiver<SlotMessage>,
+    mut config_rx: watch::Receiver<AppConfig>,
+    event_tx: broadcast::Sender<AppEvent>,
+    socket: Arc<UdpSocket>,
+    client_ip_rx: watch::Receiver<Option<SocketAddr>>,
+    client: Arc<Client>,
+) {
+    let mut target: Option<ActiveTarget> = None;
+    let mut is_active = false;
+
+    let mut current_profile = config_rx.borrow().profiles[slot_id as usize].clone();
+    let mut raw_deadzone = RawDeadzone::from(current_profile.deadzone);
+
+    loop {
+        tokio::select! {
+            res = config_rx.changed() => {
+                if res.is_ok() {
+                    current_profile = config_rx.borrow().profiles[slot_id as usize].clone();
+                    raw_deadzone = RawDeadzone::from(current_profile.deadzone);
+                } else {
+                    break;
+                }
+            }
+            res = tokio::time::timeout(Duration::from_secs(3), packet_rx.recv()) => {
+                match res {
+                    Ok(Some(msg)) => {
+                        match msg {
+                            SlotMessage::Disconnect => {
+                                target.take();
+                                is_active = false;
+
+                                continue;
+                            }
+                            SlotMessage::Data { len, buf: packet } => {
+                                if target.is_none() {
+                                    match setup_controller(
+                                        &client,
+                                        slot_id,
+                                        current_profile.controller_type,
+                                        Arc::clone(&socket),
+                                        client_ip_rx.clone(),
+                                        config_rx.clone()
+                                    ) {
+                                        Ok(t) => {
+                                            target = Some(t);
+                                        }
+                                        Err(e) => {
+                                            let _ = event_tx.send(AppEvent::Log(format!("Slot {} error: {}", slot_id + 1, e)));
+                                            tokio::time::sleep(Duration::from_secs(1)).await;
+                                            continue;
+                                        }
+                                    }
+                                }
+
+                                if !is_active {
+                                    is_active = true;
+                                    let _ = event_tx.send(AppEvent::ControllerConnected(slot_id));
+                                }
+
+                                if let Some(t) = &target {
+                                    match packet[0] {
+                                        PKT_STATE if len >= 12 => {
+                                            match &t.handle {
+                                                TargetHandleEnum::Xbox(h) => { let _ = h.update(&parse_x360_state(&packet[2..], &raw_deadzone)); }
+                                                TargetHandleEnum::Ds4(h) => { let _ = h.update(&parse_ds4_state(&packet[2..], &raw_deadzone)); }
+                                            }
+                                        }
+                                        PKT_BATTERY if len >= 4 => {
+                                            let _ = event_tx.send(AppEvent::BatteryUpdate(
+                                                slot_id,
+                                                AppInfo { controller_battery: packet[2] as i8, phone_battery: packet[3] as i8 }
+                                            ));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => { // Timeout triggers organically when packets stop arriving
+                        if is_active {
+                            is_active = false;
+
+                            let _ = event_tx.send(AppEvent::ControllerDisconnected(slot_id));
+
+                            if let Some(t) = &target {
+                                match &t.handle {
+                                    TargetHandleEnum::Xbox(h) => { let _ = h.update(&get_empty_x360_report()); }
+                                    TargetHandleEnum::Ds4(h) => { let _ = h.update(&get_empty_ds4_report()); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn setup_controller(
     client: &Client,
     slot_id: u8,
-    profile: &ProfileLogic,
-    rumble_tx: mpsc::Sender<(u8, u8, u8)>,
+    profile_type: ControllerType,
+    socket: Arc<UdpSocket>,
+    client_ip_rx: watch::Receiver<Option<SocketAddr>>,
+    config_rx: watch::Receiver<AppConfig>,
 ) -> Result<ActiveTarget> {
-    match profile.controller_type {
+    let stop_rumble = Arc::new(AtomicBool::new(false));
+
+    macro_rules! spawn_rumble {
+        ($target:expr) => {{
+            let notif_rx = $target
+                .register_notification()
+                .context("Failed to register notifications")?;
+            let stop_flag = Arc::clone(&stop_rumble);
+            let socket = Arc::clone(&socket);
+            let client_ip_rx = client_ip_rx.clone();
+            let config_rx = config_rx.clone();
+
+            tokio::task::spawn_blocking(move || {
+                while !stop_flag.load(Ordering::Relaxed) {
+                    if let Ok(Ok(n)) = notif_rx.recv_timeout(Duration::from_millis(100)) {
+                        if let Some(addr) = *client_ip_rx.borrow() {
+                            let strength = config_rx.borrow().profiles[slot_id as usize]
+                                .rumble_strength
+                                / 100.0;
+                            let large_motor =
+                                (n.large_motor as f32 * strength).clamp(0.0, 255.0) as u8;
+                            let small_motor =
+                                (n.small_motor as f32 * strength).clamp(0.0, 255.0) as u8;
+                            let _ = socket.try_send_to(&[slot_id, large_motor, small_motor], addr);
+                        }
+                    }
+                }
+            });
+        }};
+    }
+
+    match profile_type {
         ControllerType::X360 => {
             let target = client
                 .new_x360_target()
                 .plugin()
-                .context("Failed to plugin X360 target")?;
+                .context("Failed to plugin X360")?;
+            target.wait_for_ready().context("X360 not ready")?;
 
-            target.wait_for_ready().context("X360 target not ready")?;
+            spawn_rumble!(target);
 
-            let notif_rx = target
-                .register_notification()
-                .context("Failed to register X360 notifications")?;
-
-            thread::spawn(move || {
-                while let Ok(Ok(n)) = notif_rx.recv() {
-                    let _ = rumble_tx.send((slot_id, n.large_motor, n.small_motor));
-                }
-            });
-
-            Ok(ActiveTarget::Xbox(target))
+            Ok(ActiveTarget {
+                handle: TargetHandleEnum::Xbox(target),
+                stop_rumble,
+            })
         }
         ControllerType::DS4 => {
             let target = client
                 .new_ds4_target()
                 .plugin()
-                .context("Failed to plugin DS4 target")?;
+                .context("Failed to plugin DS4")?;
+            target.wait_for_ready().context("DS4 not ready")?;
 
-            target.wait_for_ready().context("DS4 target not ready")?;
+            spawn_rumble!(target);
 
-            let notif_rx = target
-                .register_notification()
-                .context("Failed to register DS4 notifications")?;
-
-            thread::spawn(move || {
-                while let Ok(Ok(n)) = notif_rx.recv() {
-                    let _ = rumble_tx.send((slot_id, n.large_motor, n.small_motor));
-                }
-            });
-
-            Ok(ActiveTarget::Ds4(target))
-        }
-    }
-}
-
-fn run_session(
-    settings: LogicSettings,
-    command_rx: &Receiver<LogicCommand>,
-    update_tx: &EventProxy,
-    last_client_addr: Arc<Mutex<Option<SocketAddr>>>,
-) -> Result<()> {
-    let bind_port = match settings.port {
-        Some(p) => p,
-        None => {
-            let temp_socket =
-                UdpSocket::bind("0.0.0.0:0").context("Failed to bind temporary socket")?;
-            temp_socket
-                .local_addr()
-                .context("Could not get local address")?
-                .port()
-        }
-    };
-
-    let client = match Client::connect() {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = update_tx.send(UiUpdate::MissingDriver);
-            return Err(anyhow!("ViGEmBus Client failed: {}", e));
-        }
-    };
-
-    let socket =
-        UdpSocket::bind(format!("0.0.0.0:{}", bind_port)).context("Failed to bind UDP socket")?;
-
-    socket
-        .set_read_timeout(Some(Duration::from_millis(100)))
-        .context("Failed to set read timeout")?;
-
-    let local_port = socket
-        .local_addr()
-        .context("Could not get local address")?
-        .port();
-
-    let shared_socket = Arc::new(socket);
-
-    // Rumble array per-slot
-    let shared_rumble_bits = Arc::new([
-        AtomicU32::new(settings.profiles[0].rumble_strength.to_bits()),
-        AtomicU32::new(settings.profiles[1].rumble_strength.to_bits()),
-        AtomicU32::new(settings.profiles[2].rumble_strength.to_bits()),
-        AtomicU32::new(settings.profiles[3].rumble_strength.to_bits()),
-    ]);
-
-    let (rumble_tx, rumble_rx) = mpsc::channel::<(u8, u8, u8)>();
-
-    // Broadcast
-    let stop_broadcast_flag = Arc::new(AtomicBool::new(false));
-    let hostname = settings.hostname.clone();
-
-    let spawn_discovery = |stop_flag: Arc<AtomicBool>, tx: EventProxy| {
-        discovery::start_beacon(local_port, stop_flag, tx, hostname.clone());
-    };
-
-    spawn_discovery(Arc::clone(&stop_broadcast_flag), update_tx.clone());
-
-    // Rumble thread
-    let socket_clone = Arc::clone(&shared_socket);
-    let client_addr_clone = Arc::clone(&last_client_addr);
-    let rumble_bits_ref = Arc::clone(&shared_rumble_bits);
-
-    thread::spawn(move || {
-        while let Ok((slot_id, large, small)) = rumble_rx.recv() {
-            if slot_id >= 4 {
-                continue;
-            }
-            let strength =
-                f32::from_bits(rumble_bits_ref[slot_id as usize].load(Ordering::Relaxed));
-
-            let large_motor = (large as f32 * strength).clamp(0.0, 255.0) as u8;
-            let small_motor = (small as f32 * strength).clamp(0.0, 255.0) as u8;
-
-            if let Some(addr) = *client_addr_clone.lock().unwrap() {
-                let _ = socket_clone.send_to(&[slot_id, large_motor, small_motor], addr);
-            }
-        }
-    });
-
-    let _ = update_tx.send(UiUpdate::ReceiverStateChanged(ReceiverState::On));
-    let ip_str = local_ip()
-        .ok()
-        .map(|ip| ip.to_string())
-        .unwrap_or("Unknown IP".to_string());
-    let _ = update_tx.send(UiUpdate::Log(format!(
-        "Listening on {}:{}",
-        ip_str, local_port
-    )));
-
-    let mut connected_source: Option<SocketAddr> = None;
-    let mut buf = [0u8; 32];
-
-    let mut local_profiles = settings.profiles;
-    let mut slots: [Option<SlotData>; 4] = [None, None, None, None];
-    let mut is_connected = false;
-
-    loop {
-        match command_rx.try_recv() {
-            Ok(LogicCommand::Stop) | Err(TryRecvError::Disconnected) => break,
-            Ok(LogicCommand::UpdateSettings(new_settings)) => {
-                local_profiles = new_settings.profiles.clone();
-                for i in 0..4 {
-                    shared_rumble_bits[i].store(
-                        new_settings.profiles[i].rumble_strength.to_bits(),
-                        Ordering::Relaxed,
-                    );
-                }
-            }
-            _ => {}
-        }
-
-        match shared_socket.recv_from(&mut buf) {
-            Ok((amt, src)) => {
-                if let Some(locked_ip) = connected_source {
-                    if src != locked_ip {
-                        continue;
-                    }
-                } else {
-                    connected_source = Some(src);
-                    *last_client_addr.lock().unwrap() = Some(src);
-                    stop_broadcast_flag.store(true, Ordering::Relaxed);
-                    is_connected = true;
-                }
-
-                let packet = &buf[..amt];
-                let slot_id = packet[1];
-                let slot_idx = slot_id as usize;
-
-                if slot_idx >= 4 {
-                    continue;
-                }
-
-                match PacketType::try_from(packet[0]) {
-                    Ok(PacketType::State) => {
-                        let payload = &packet[2..];
-                        if let Some(slot) = &mut slots[slot_idx] {
-                            slot.last_packet_time = std::time::Instant::now();
-                            match &slot.target {
-                                ActiveTarget::Xbox(handle) => {
-                                    let report = parse_x360_state(
-                                        payload,
-                                        &local_profiles[slot_idx].deadzone,
-                                    );
-                                    let _ = handle.update(&report);
-                                }
-                                ActiveTarget::Ds4(handle) => {
-                                    let report = parse_ds4_state(
-                                        payload,
-                                        &local_profiles[slot_idx].deadzone,
-                                    );
-                                    let _ = handle.update(&report);
-                                }
-                            }
-                        }
-                    }
-                    Ok(PacketType::Battery) => {
-                        if slots[slot_idx].is_none() {
-                            let target_res = setup_controller(
-                                &client,
-                                slot_id,
-                                &local_profiles[slot_idx],
-                                rumble_tx.clone(),
-                            );
-                            match target_res {
-                                Ok(target) => {
-                                    slots[slot_idx] = Some(SlotData {
-                                        target,
-                                        last_packet_time: std::time::Instant::now(),
-                                    })
-                                }
-                                Err(e) => {
-                                    let _ = update_tx.send(UiUpdate::Log(format!(
-                                        "Slot {} failed: {}",
-                                        slot_idx + 1,
-                                        e
-                                    )));
-                                }
-                            }
-                        }
-
-                        if let Some(slot) = &mut slots[slot_idx] {
-                            slot.last_packet_time = std::time::Instant::now();
-                        }
-
-                        let controller_battery = packet[2] as i8;
-                        let phone_battery = packet[3] as i8;
-                        let _ = update_tx.send(UiUpdate::BatteryUpdate(
-                            slot_id,
-                            AppInfo {
-                                controller_battery,
-                                phone_battery,
-                            },
-                        ));
-                    }
-                    Err(_) => {
-                        let _ = update_tx.send(UiUpdate::Error(format!(
-                            "Unsupported packet header: {}",
-                            buf[0]
-                        )));
-                    }
-                }
-            }
-            Err(e)
-                if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut =>
-            {
-                let now = std::time::Instant::now();
-                let mut any_active = false;
-
-                for i in 0..4 {
-                    if let Some(slot) = &slots[i] {
-                        if now.duration_since(slot.last_packet_time) > Duration::from_secs_f32(2.5)
-                        {
-                            slots[i] = None;
-                            let _ = update_tx.send(UiUpdate::ControllerDisconnected(i as u8));
-                        } else {
-                            any_active = true;
-                        }
-                    }
-                }
-
-                // If completely disconnected, safely unlock to allow searching new IP
-                if is_connected && !any_active {
-                    is_connected = false;
-                    connected_source = None;
-                    *last_client_addr.lock().unwrap() = None;
-
-                    stop_broadcast_flag.store(false, Ordering::Relaxed);
-                    spawn_discovery(Arc::clone(&stop_broadcast_flag), update_tx.clone());
-                    let _ =
-                        update_tx.send(UiUpdate::Log("Listening for new devices...".to_string()));
-                }
-
-                continue;
-            }
-            Err(e) => {
-                return Err(anyhow::Error::new(e).context("Socket fatal error"));
-            }
-        }
-    }
-
-    stop_broadcast_flag.store(true, Ordering::Relaxed);
-    Ok(())
-}
-
-pub fn run(command_rx: Receiver<LogicCommand>, update_tx: EventProxy) {
-    let last_client_addr = Arc::new(Mutex::new(None));
-
-    loop {
-        match command_rx.recv() {
-            Ok(LogicCommand::Start(config)) => {
-                if let Err(e) = run_session(
-                    config,
-                    &command_rx,
-                    &update_tx,
-                    Arc::clone(&last_client_addr),
-                ) {
-                    let _ = update_tx.send(UiUpdate::Error(e.to_string()));
-                }
-
-                *last_client_addr.lock().unwrap() = None;
-                let _ = update_tx.send(UiUpdate::ReceiverStateChanged(ReceiverState::Off));
-                let _ = update_tx.send(UiUpdate::Log("Stopped.".to_string()));
-            }
-            Err(_) => {
-                break;
-            }
-            _ => {}
+            Ok(ActiveTarget {
+                handle: TargetHandleEnum::Ds4(target),
+                stop_rumble,
+            })
         }
     }
 }

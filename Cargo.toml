@@ -3,7 +3,7 @@ name = "controlay"
 version = "1.0.0"
 edition = "2024"
 authors = ["arounre"]
-description = "Windows receiver for Controlay: Emulate game controllers on PC using your Android phone as a wireless bridge."
+description = "Receiver for Controlay: Emulate game controllers on PC using your Android phone as a wireless bridge."
 homepage = "https://github.com/arounre/controlay"
 repository = "https://github.com/arounre/controlay"
 documentation = "https://github.com/arounre/controlay#usage"
@@ -13,35 +13,35 @@ keywords = ["controller", "emulation", "gaming", "network", "android"]
 categories = ["emulators", "hardware-support"]
 
 [dependencies]
-eframe = { version = "0.34.1", default-features = false, features = [
+eframe = { version = "0.34.2", default-features = false, features = [
     "persistence",
     "glow",
 ] }
-egui = "0.34.1"
+egui = "0.34.2"
 egui_commonmark = { version = "0.23.0", default-features = false }
 hostname = "0.4.2"
-local-ip-address = "0.6.5"
+local-ip-address = "0.6.12"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.145"
-tray-icon = "0.23.0"
-vigem-rust = "0.1.1"
-winit = "0.30.12"
-# used in flip_window_visibility for tray support workaround
-windows = { version = "0.62.2", features = [
-    "Win32",
-    "Win32_UI",
-    "Win32_UI_WindowsAndMessaging",
-] }
+serde_json = "1.0.149"
+tray-icon = "0.24.0"
+winit = "0.30.13"
 single-instance = "0.3.3"
-native-dialog = "0.9.4"
-reqwest = { version = "0.13.1", features = ["blocking", "json"] }
-semver = "1.0.27"
-anyhow = "1.0.100"
+native-dialog = "0.9.6"
+reqwest = { version = "0.13.3", features = ["blocking", "json"] }
+semver = "1.0.28"
+anyhow = "1.0.102"
 notify-rust = "4.17.0"
+tokio = { version = "1.52.3", features = ["full"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+vigem-rust = "0.1.1"
 
 [build-dependencies]
-image = { version = "0.25.6", default-features = false, features = ["png"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
 winres = "0.1.12"
+
 
 [profile.release]
 opt-level = 3

@@ -1,8 +1,8 @@
 use crate::app::ControlayApp;
-use crate::app::ReceiverState;
 use crate::app::Tab;
 use crate::config::ControllerType;
 use crate::config::ThemeMode;
+use crate::core::ReceiverState;
 use eframe::egui::{self, Ui};
 use egui::RichText;
 use egui::Vec2;
@@ -28,6 +28,7 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
         .show(ui.ctx(), |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
                 let mut any_connected = false;
+                let mut disconnect_requests = Vec::new();
 
                 for (i, slot) in app.controllers.iter().enumerate() {
                     if let Some(state) = slot {
@@ -37,26 +38,52 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
                             .fill(ui.visuals().window_fill())
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(
-                                        RichText::new(format!("P{}", i + 1)).size(11.0).strong(),
-                                    );
-                                    ui.add_space(2.0);
-
-                                    draw_battery_icon(ui, state.info.phone_battery, "Phone");
-                                    ui.label(RichText::new("📱").size(14.0));
+                                    if ui
+                                        .button(RichText::new("❌").size(10.0))
+                                        .on_hover_text("Disconnect Controller")
+                                        .clicked()
+                                    {
+                                        disconnect_requests.push(i as u8);
+                                    }
                                     ui.add_space(4.0);
 
-                                    draw_battery_icon(
-                                        ui,
-                                        state.info.controller_battery,
-                                        "Controller",
-                                    );
-                                    ui.label(RichText::new("🎮").size(14.0));
+                                    let is_active = state.is_active;
+
+                                    ui.add_enabled_ui(is_active, |ui| {
+                                        draw_battery_icon(
+                                            ui,
+                                            state.info.phone_battery,
+                                            "Phone",
+                                            is_active,
+                                        );
+                                        ui.label(RichText::new("📱").size(14.0));
+                                        ui.add_space(4.0);
+
+                                        draw_battery_icon(
+                                            ui,
+                                            state.info.controller_battery,
+                                            "Controller",
+                                            is_active,
+                                        );
+                                        ui.label(RichText::new("🎮").size(14.0));
+
+                                        ui.add_space(4.0);
+                                        ui.label(
+                                            RichText::new(format!("P{}", i + 1))
+                                                .size(11.0)
+                                                .strong(),
+                                        );
+                                    });
                                 });
                             });
 
                         ui.add_space(4.0);
                     }
+                }
+
+                // Process disconnect requests
+                for slot_id in disconnect_requests {
+                    app.force_disconnect(slot_id);
                 }
 
                 if !any_connected {
@@ -139,7 +166,13 @@ pub fn draw_home_tab(app: &mut ControlayApp, ui: &mut Ui) {
                     app.stop_broadcasting();
                 }
 
-                let active_count = app.controllers.iter().filter(|c| c.is_some()).count();
+                let active_count = app
+                    .controllers
+                    .iter()
+                    .flatten()
+                    .filter(|state| state.is_active)
+                    .count();
+
                 if active_count > 0 {
                     ui.label(
                         RichText::new(format!("{} Controllers Active", active_count))
@@ -436,7 +469,7 @@ pub fn draw_about_tab(app: &mut ControlayApp, ui: &mut Ui) {
     });
 }
 
-fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str) {
+fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str, is_active: bool) {
     let width = 24.0;
     let height = 12.0;
     let tip_width = 2.0;
@@ -451,7 +484,10 @@ fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str) {
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
-        let color = if percentage > 50 {
+
+        let fill_color = if !is_active {
+            ui.visuals().weak_text_color()
+        } else if percentage > 50 {
             egui::Color32::GREEN
         } else if percentage > 20 {
             egui::Color32::YELLOW
@@ -459,12 +495,18 @@ fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str) {
             egui::Color32::RED
         };
 
+        let stroke_color = if is_active {
+            ui.visuals().text_color()
+        } else {
+            ui.visuals().weak_text_color()
+        };
+
         let body_rect = egui::Rect::from_min_size(rect.min, egui::vec2(width, height));
 
         painter.rect_stroke(
             body_rect,
             2.0,
-            egui::Stroke::new(1.0, ui.visuals().text_color()),
+            egui::Stroke::new(1.0, stroke_color),
             egui::StrokeKind::Inside,
         );
 
@@ -473,18 +515,19 @@ fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str) {
             body_rect.min + egui::vec2(1.0, 1.0),
             egui::vec2(fill_width, height - 2.0),
         );
-        painter.rect_filled(fill_rect, 2.0, color);
+        painter.rect_filled(fill_rect, 2.0, fill_color);
 
         let tip_rect = egui::Rect::from_min_size(
             egui::pos2(body_rect.max.x, body_rect.center().y - tip_height / 2.0),
             egui::vec2(tip_width, tip_height),
         );
-        painter.rect_filled(tip_rect, 1.0, ui.visuals().text_color());
+        painter.rect_filled(tip_rect, 1.0, stroke_color);
     }
 }
 
 pub fn draw_driver_alert(app: &mut ControlayApp, ctx: &egui::Context) {
     let mut open = app.show_driver_alert;
+    let mut close_requested = false;
 
     egui::Window::new("Broadcast Failed")
         .open(&mut open)
@@ -505,24 +548,39 @@ pub fn draw_driver_alert(app: &mut ControlayApp, ctx: &egui::Context) {
                 ui.label("Please install the driver and try again.");
                 ui.add_space(20.0);
 
-                let btn = egui::Button::new(
-                    RichText::new("⬇ Download Installer")
-                        .size(16.0)
-                        .color(egui::Color32::WHITE),
-                )
-                .min_size(egui::vec2(200.0, 40.0))
-                .fill(egui::Color32::from_rgb(0, 100, 200));
+                ui.horizontal(|ui| {
+                    let total_width = 160.0 + ui.spacing().item_spacing.x + 80.0;
+                    ui.add_space((ui.available_width() - total_width) / 2.0);
 
-                if ui.add(btn).clicked() {
-                    open_url(VIGEM_URL);
-                }
+                    let btn_download = egui::Button::new(
+                        RichText::new("⬇ Download")
+                            .size(14.0)
+                            .color(egui::Color32::WHITE),
+                    )
+                    .min_size(egui::vec2(160.0, 30.0))
+                    .fill(egui::Color32::from_rgb(0, 100, 200));
+
+                    if ui.add(btn_download).clicked() {
+                        ui.ctx().open_url(egui::output::OpenUrl::new_tab(VIGEM_URL));
+                        close_requested = true;
+                    }
+
+                    let btn_dismiss = egui::Button::new("Dismiss").min_size(egui::vec2(80.0, 30.0));
+
+                    if ui.add(btn_dismiss).clicked() {
+                        close_requested = true;
+                    }
+                });
 
                 ui.add_space(5.0);
-                ui.small("Opens GitHub Releases in your browser");
+                ui.small(RichText::new("Opens GitHub Releases in your browser").weak());
                 ui.add_space(20.0);
             });
         });
 
+    if close_requested {
+        open = false;
+    }
     app.show_driver_alert = open;
 }
 
@@ -563,7 +621,7 @@ pub fn draw_update_alert(app: &mut ControlayApp, ctx: &egui::Context) {
                         .fill(egui::Color32::from_rgb(0, 100, 200));
 
                         if ui.add(btn_download).clicked() {
-                            open_url(&info.url);
+                            ui.ctx().open_url(egui::output::OpenUrl::new_tab(&info.url));
                             close_requested = true;
                         }
 
@@ -585,11 +643,4 @@ pub fn draw_update_alert(app: &mut ControlayApp, ctx: &egui::Context) {
         open = false;
     }
     app.show_update_alert = open;
-}
-
-fn open_url(url: &str) {
-    #[cfg(target_os = "windows")]
-    let _ = std::process::Command::new("cmd")
-        .args(["/C", "start", "", &format!("\"{}\"", url)])
-        .spawn();
 }

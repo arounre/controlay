@@ -1,8 +1,7 @@
+use crate::core::AppEvent;
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::thread;
-
-use crate::app::{EventProxy, UiUpdate};
+use tokio::sync::broadcast;
 
 pub const REPO_OWNER: &str = "arounre";
 pub const REPO_NAME: &str = "controlay";
@@ -13,27 +12,23 @@ struct Release {
     html_url: String,
 }
 
+#[derive(Clone)]
 pub struct UpdateInfo {
     pub version: String,
     pub url: String,
 }
 
-pub fn check_for_updates(proxy: EventProxy) {
+pub fn check_for_updates(event_tx: broadcast::Sender<AppEvent>) {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
-
-    thread::spawn(move || {
-        match internal_check(&current_version) {
-            Ok(Some(info)) => {
-                proxy.send(UiUpdate::UpdateAvailable(info));
-            }
-            Ok(None) => {
-                // Either up-to-date or gracefully ignored (like a rate limit)
-            }
-            Err(e) => {
-                proxy.send(UiUpdate::Log(format!("Update check failed: {}", e)));
-            }
+    match internal_check(&current_version) {
+        Ok(Some(info)) => {
+            let _ = event_tx.send(AppEvent::UpdateAvailable(info));
         }
-    });
+        Ok(None) => {}
+        Err(e) => {
+            let _ = event_tx.send(AppEvent::Log(format!("Update check failed: {}", e)));
+        }
+    }
 }
 
 fn internal_check(current_ver: &str) -> Result<Option<UpdateInfo>> {

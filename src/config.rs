@@ -21,16 +21,17 @@ impl Default for DeadzoneConfig {
 pub struct RawDeadzone {
     pub inner: i16,
     pub outer: i16,
+    pub scale_factor: f32,
 }
 
 impl RawDeadzone {
-    pub fn apply(&self, value: i16) -> i16 {
+    #[inline(always)]
+    pub fn apply(&self, mut value: i16) -> i16 {
         if value == i16::MIN {
-            return -MAX_STICK_VALUE;
+            value = -MAX_STICK_VALUE;
         }
 
         let abs_val = value.abs();
-
         if abs_val < self.inner {
             return 0;
         }
@@ -43,9 +44,8 @@ impl RawDeadzone {
             };
         }
 
-        let range = (self.outer - self.inner) as f32;
         let val_offset = (abs_val - self.inner) as f32;
-        let magnitude = ((val_offset / range) * MAX_STICK_VALUE as f32) as i16;
+        let magnitude = (val_offset * self.scale_factor) as i16;
 
         if value > 0 { magnitude } else { -magnitude }
     }
@@ -54,9 +54,16 @@ impl RawDeadzone {
 impl From<DeadzoneConfig> for RawDeadzone {
     fn from(cfg: DeadzoneConfig) -> Self {
         let max = MAX_STICK_VALUE as f32;
+        let inner = (cfg.inner_percent / 100.0 * max) as i16;
+        let outer = (cfg.outer_percent / 100.0 * max) as i16;
+
+        let range = (outer - inner) as f32;
+        let scale_factor = if range > 0.0 { max / range } else { 0.0 };
+
         RawDeadzone {
-            inner: (cfg.inner_percent / 100.0 * max) as i16,
-            outer: (cfg.outer_percent / 100.0 * max) as i16,
+            inner,
+            outer,
+            scale_factor,
         }
     }
 }
@@ -131,62 +138,12 @@ impl Default for AppConfig {
             theme: ThemeMode::System,
             auto_start: false,
             tray_on_close: false,
-            check_updates: false,
-            enable_battery_notifications: true,
-            enable_connection_notifications: true,
+            check_updates: true,
+            enable_battery_notifications: false,
+            enable_connection_notifications: false,
             battery_warn_threshold_controller: 20,
             battery_warn_threshold_phone: 15,
             dismissed_update_version: None,
-        }
-    }
-}
-
-// DTO for the Logic Thread
-#[derive(Clone)]
-pub struct ProfileLogic {
-    pub controller_type: ControllerType,
-    pub deadzone: RawDeadzone,
-    pub rumble_strength: f32,
-}
-
-impl From<&ControllerProfile> for ProfileLogic {
-    fn from(profile: &ControllerProfile) -> Self {
-        let max = MAX_STICK_VALUE as f32;
-
-        let raw_deadzone = RawDeadzone {
-            inner: (profile.deadzone.inner_percent / 100.0 * max) as i16,
-            outer: (profile.deadzone.outer_percent / 100.0 * max) as i16,
-        };
-
-        ProfileLogic {
-            controller_type: profile.controller_type,
-            deadzone: raw_deadzone,
-            rumble_strength: (profile.rumble_strength / 100.0).clamp(0.0, 2.0),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct LogicSettings {
-    pub port: Option<u16>,
-    pub profiles: [ProfileLogic; 4],
-    pub hostname: Option<String>,
-}
-
-impl From<&AppConfig> for LogicSettings {
-    fn from(cfg: &AppConfig) -> Self {
-        LogicSettings {
-            port: if cfg.use_custom_port {
-                Some(cfg.port)
-            } else {
-                None
-            },
-            profiles: std::array::from_fn(|i| ProfileLogic::from(&cfg.profiles[i])),
-            hostname: if cfg.use_default_hostname {
-                None
-            } else {
-                Some(cfg.hostname.clone())
-            },
         }
     }
 }

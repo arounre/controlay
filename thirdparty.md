@@ -4,7 +4,7 @@ This page lists the licenses of the projects used in this application.
 
 ## Overview of licenses
 
-* [MIT License](#MIT) (456)
+* [MIT License](#MIT) (458)
 * [Unicode License v3](#Unicode-3.0) (19)
 * [Apache License 2.0](#Apache-2.0) (18)
 * [BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License](#BSD-3-Clause) (7)
@@ -1316,7 +1316,7 @@ Apache License
 **Used by:**
 * [ab_glyph 0.2.32](https://github.com/alexheretic/ab-glyph)
 * [ab_glyph_rasterizer 0.1.10](https://github.com/alexheretic/ab-glyph)
-* [aws-lc-sys 0.40.0](https://github.com/aws/aws-lc-rs)
+* [aws-lc-sys 0.41.0](https://github.com/aws/aws-lc-rs)
 * [dunce 1.0.5](https://gitlab.com/kornelski/dunce)
 * [gl_generator 0.14.0](https://github.com/brendanzab/gl-rs/)
 * [khronos_api 3.1.0](https://github.com/brendanzab/gl-rs/)
@@ -1560,7 +1560,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ### BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License
 
 **Used by:**
-* [aws-lc-sys 0.40.0](https://github.com/aws/aws-lc-rs)
+* [aws-lc-sys 0.41.0](https://github.com/aws/aws-lc-rs)
 
 #### License Text
 ```text
@@ -2497,8 +2497,8 @@ third-party/chromium/LICENSE.
 ### ISC License
 
 **Used by:**
-* [aws-lc-rs 1.16.3](https://github.com/aws/aws-lc-rs)
-* [aws-lc-sys 0.40.0](https://github.com/aws/aws-lc-rs)
+* [aws-lc-rs 1.17.0](https://github.com/aws/aws-lc-rs)
+* [aws-lc-sys 0.41.0](https://github.com/aws/aws-lc-rs)
 
 #### License Text
 ```text
@@ -2689,7 +2689,7 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [cc 1.2.61](https://github.com/rust-lang/cc-rs)
+* [cc 1.2.62](https://github.com/rust-lang/cc-rs)
 * [cfg-if 1.0.4](https://github.com/rust-lang/cfg-if)
 * [cmake 0.1.58](https://github.com/rust-lang/cmake-rs)
 * [find-msvc-tools 0.1.9](https://github.com/rust-lang/cc-rs)
@@ -3450,7 +3450,7 @@ DEALINGS IN THE SOFTWARE.
 
 **Used by:**
 * [hashbrown 0.16.1](https://github.com/rust-lang/hashbrown)
-* [hashbrown 0.17.0](https://github.com/rust-lang/hashbrown)
+* [hashbrown 0.17.1](https://github.com/rust-lang/hashbrown)
 
 #### License Text
 ```text
@@ -4330,8 +4330,9 @@ THE SOFTWARE.
 
 **Used by:**
 * [fearless_simd 0.3.0](https://github.com/linebender/fearless_simd)
-* [kurbo 0.13.0](https://github.com/linebender/kurbo)
-* [peniko 0.6.0](https://github.com/linebender/peniko)
+* [kurbo 0.13.1](https://github.com/linebender/kurbo)
+* [peniko 0.6.1](https://github.com/linebender/peniko)
+* [polycool 0.4.0](https://github.com/linebender/kurbo)
 
 #### License Text
 ```text
@@ -6558,6 +6559,38 @@ SOFTWARE.
 ### MIT License
 
 **Used by:**
+* [tokio-macros 2.7.0](https://github.com/tokio-rs/tokio)
+
+#### License Text
+```text
+MIT License
+
+Copyright (c) 2019 Yoshua Wuyts
+Copyright (c) Tokio Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+```
+
+### MIT License
+
+**Used by:**
 * [proc-macro-error-attr2 2.0.0](https://github.com/GnomedDev/proc-macro-error-2)
 * [proc-macro-error-attr 1.0.4](https://gitlab.com/CreepySkeleton/proc-macro-error)
 * [proc-macro-error2 2.0.1](https://github.com/GnomedDev/proc-macro-error-2)
@@ -6829,7 +6862,7 @@ SOFTWARE.
 
 **Used by:**
 * [muda 0.19.1](https://github.com/tauri-apps/muda)
-* [tray-icon 0.23.1](https://github.com/tauri-apps/tray-icon)
+* [tray-icon 0.24.0](https://github.com/tauri-apps/tray-icon)
 
 #### License Text
 ```text
@@ -7057,7 +7090,7 @@ THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRES
 
 **Used by:**
 * [tokio-util 0.7.18](https://github.com/tokio-rs/tokio)
-* [tokio 1.52.2](https://github.com/tokio-rs/tokio)
+* [tokio 1.52.3](https://github.com/tokio-rs/tokio)
 
 #### License Text
 ```text
@@ -7439,9 +7472,9 @@ DEALINGS IN THE SOFTWARE.
 * [once_cell 1.21.4](https://github.com/matklad/once_cell)
 * [ordered-stream 0.2.0](https://github.com/danieldg/ordered-stream)
 * [parking 2.2.1](https://github.com/smol-rs/parking)
-* [pin-project-internal 1.1.12](https://github.com/taiki-e/pin-project)
+* [pin-project-internal 1.1.13](https://github.com/taiki-e/pin-project)
 * [pin-project-lite 0.2.17](https://github.com/taiki-e/pin-project-lite)
-* [pin-project 1.1.12](https://github.com/taiki-e/pin-project)
+* [pin-project 1.1.13](https://github.com/taiki-e/pin-project)
 * [piper 0.2.5](https://github.com/smol-rs/piper)
 * [polling 3.11.0](https://github.com/smol-rs/polling)
 * [proc-macro-crate 1.3.1](https://github.com/bkchr/proc-macro-crate)
@@ -7542,7 +7575,7 @@ DEALINGS IN THE SOFTWARE.
 
 **Used by:**
 * [winnow 0.5.40](https://github.com/winnow-rs/winnow)
-* [winnow 1.0.2](https://github.com/winnow-rs/winnow)
+* [winnow 1.0.3](https://github.com/winnow-rs/winnow)
 
 #### License Text
 ```text
@@ -7930,7 +7963,7 @@ SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [aws-lc-sys 0.40.0](https://github.com/aws/aws-lc-rs)
+* [aws-lc-sys 0.41.0](https://github.com/aws/aws-lc-rs)
 
 #### License Text
 ```text
@@ -8257,7 +8290,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 **Used by:**
 * [quick-xml 0.37.5](https://github.com/tafia/quick-xml)
-* [quick-xml 0.39.3](https://github.com/tafia/quick-xml)
+* [quick-xml 0.39.4](https://github.com/tafia/quick-xml)
 
 #### License Text
 ```text
@@ -8944,7 +8977,7 @@ authorization of the copyright holder.
 * [yoke-derive 0.8.2](https://github.com/unicode-org/icu4x)
 * [yoke 0.8.2](https://github.com/unicode-org/icu4x)
 * [zerofrom-derive 0.1.7](https://github.com/unicode-org/icu4x)
-* [zerofrom 0.1.7](https://github.com/unicode-org/icu4x)
+* [zerofrom 0.1.8](https://github.com/unicode-org/icu4x)
 * [zerotrie 0.2.4](https://github.com/unicode-org/icu4x)
 * [zerovec-derive 0.11.3](https://github.com/unicode-org/icu4x)
 * [zerovec 0.11.6](https://github.com/unicode-org/icu4x)

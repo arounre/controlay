@@ -1,69 +1,83 @@
-use std::net::UdpSocket;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-use std::thread;
+use std::net::SocketAddr;
 use std::time::Duration;
+use tokio::net::UdpSocket;
+use tokio::sync::watch;
 
-use crate::app::EventProxy;
+use crate::config::AppConfig;
 
 const BROADCAST_TARGET_PORT: u16 = 8888;
+const BROADCAST_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(serde::Serialize)]
-struct DiscoveryMsg {
-    name: String,
+struct DiscoveryMsg<'a> {
+    name: &'a str,
     port: u16,
 }
 
-pub fn start_beacon(
+pub async fn start_beacon(
     listening_port: u16,
-    stop_signal: Arc<AtomicBool>,
-    log_tx: EventProxy,
-    host_name: Option<String>,
+    config_rx: watch::Receiver<AppConfig>,
+    mut client_ip_rx: watch::Receiver<Option<SocketAddr>>,
 ) {
-    thread::spawn(move || {
-        let socket = match UdpSocket::bind("0.0.0.0:0") {
-            Ok(s) => s,
-            Err(e) => {
-                log_tx.send(crate::app::UiUpdate::Log(format!("Discovery Error: {}", e)));
-                return;
-            }
-        };
+    let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await else {
+        return;
+    };
+    let _ = socket.set_broadcast(true);
 
-        if let Err(e) = socket.set_broadcast(true) {
-            log_tx.send(crate::app::UiUpdate::Log(format!("Discovery Error: {}", e)));
-            return;
-        }
+    let target = format!("255.255.255.255:{}", BROADCAST_TARGET_PORT);
 
-        let device_name = host_name.unwrap_or_else(|| {
-            hostname::get()
-                .ok()
-                .and_then(|s| s.into_string().ok())
-                .unwrap_or_else(|| "Unknown-PC".to_string())
-        });
+    let sys_hostname = hostname::get()
+        .ok()
+        .and_then(|s| s.into_string().ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Unknown-PC".to_string());
 
-        let msg = DiscoveryMsg {
-            name: device_name,
-            port: listening_port,
-        };
+    let mut cached_name = String::new();
+    let mut cached_payload = Vec::new();
 
-        let payload_bytes = serde_json::to_vec(&msg).unwrap_or_default();
-        let target = format!("255.255.255.255:{}", BROADCAST_TARGET_PORT);
-
-        log_tx.send(crate::app::UiUpdate::Log(
-            "Broadcasting availability...".to_string(),
-        ));
-
-        loop {
-            if stop_signal.load(Ordering::Relaxed) {
-                log_tx.send(crate::app::UiUpdate::Log("Stopping broadcasts".to_string()));
+    loop {
+        if client_ip_rx.borrow().is_some() {
+            // Gracefully exit if the server drops the channel lock
+            if client_ip_rx.wait_for(|ip| ip.is_none()).await.is_err() {
                 break;
             }
-
-            let _ = socket.send_to(&payload_bytes, &target);
-
-            thread::sleep(Duration::from_secs(2));
+            continue;
         }
-    });
+
+        {
+            let cfg = config_rx.borrow();
+            let desired_name = if cfg.use_default_hostname || cfg.hostname.trim().is_empty() {
+                sys_hostname.as_str()
+            } else {
+                cfg.hostname.trim()
+            };
+
+            if desired_name != cached_name || cached_payload.is_empty() {
+                cached_name = desired_name.to_string();
+
+                let msg = DiscoveryMsg {
+                    name: &cached_name,
+                    port: listening_port,
+                };
+
+                if let Ok(payload) = serde_json::to_vec(&msg) {
+                    cached_payload = payload;
+                }
+            }
+        }
+
+        if !cached_payload.is_empty() {
+            let _ = socket.send_to(&cached_payload, &target).await;
+        }
+
+        tokio::select! {
+            _ = tokio::time::sleep(BROADCAST_INTERVAL) => {}
+            res = client_ip_rx.changed() => {
+                if res.is_err() {
+                    break;
+                }
+            }
+        }
+    }
 }
