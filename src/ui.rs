@@ -26,7 +26,7 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
         )
         .order(egui::Order::Foreground)
         .show(ui.ctx(), |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::RIGHT), |ui| {
+            ui.vertical(|ui| {
                 let mut any_connected = false;
                 let mut disconnect_requests = Vec::new();
 
@@ -38,6 +38,36 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
                             .fill(ui.visuals().window_fill())
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
+                                    ui.label(
+                                        RichText::new(format!("P{}", i + 1))
+                                            .size(11.0)
+                                            .strong(),
+                                    );
+                                    ui.add_space(4.0);
+
+                                    let is_active = state.is_active;
+
+                                    ui.add_enabled_ui(is_active, |ui| {
+                                        ui.label(RichText::new("🎮").size(14.0));
+                                        draw_battery_icon(
+                                            ui,
+                                            state.info.controller_battery,
+                                            "Controller",
+                                            is_active,
+                                        );
+                                        ui.add_space(4.0);
+
+                                        ui.label(RichText::new("📱").size(14.0));
+                                        draw_battery_icon(
+                                            ui,
+                                            state.info.phone_battery,
+                                            "Phone",
+                                            is_active,
+                                        );
+                                    });
+
+                                    ui.add_space(4.0);
+
                                     if ui
                                         .button(RichText::new("❌").size(10.0))
                                         .on_hover_text("Disconnect Controller")
@@ -45,35 +75,6 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
                                     {
                                         disconnect_requests.push(i as u8);
                                     }
-                                    ui.add_space(4.0);
-
-                                    let is_active = state.is_active;
-
-                                    ui.add_enabled_ui(is_active, |ui| {
-                                        draw_battery_icon(
-                                            ui,
-                                            state.info.phone_battery,
-                                            "Phone",
-                                            is_active,
-                                        );
-                                        ui.label(RichText::new("📱").size(14.0));
-                                        ui.add_space(4.0);
-
-                                        draw_battery_icon(
-                                            ui,
-                                            state.info.controller_battery,
-                                            "Controller",
-                                            is_active,
-                                        );
-                                        ui.label(RichText::new("🎮").size(14.0));
-
-                                        ui.add_space(4.0);
-                                        ui.label(
-                                            RichText::new(format!("P{}", i + 1))
-                                                .size(11.0)
-                                                .strong(),
-                                        );
-                                    });
                                 });
                             });
 
@@ -123,7 +124,6 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
 
     ui.add_space(10.0);
 }
-
 pub fn draw_home_tab(app: &mut ControlayApp, ui: &mut Ui) {
     ui.vertical_centered(|ui| {
         ui.add_space(20.0);
