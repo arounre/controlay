@@ -4,15 +4,14 @@ This page lists the licenses of the projects used in this application.
 
 ## Overview of licenses
 
-* [MIT License](#MIT) (458)
+* [MIT License](#MIT) (450)
 * [Unicode License v3](#Unicode-3.0) (19)
-* [Apache License 2.0](#Apache-2.0) (18)
-* [BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License](#BSD-3-Clause) (7)
+* [Apache License 2.0](#Apache-2.0) (15)
 * [ISC License](#ISC) (6)
 * [The Unlicense](#Unlicense) (6)
+* [BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License](#BSD-3-Clause) (5)
 * [Boost Software License 1.0](#BSL-1.0) (2)
 * [zlib License](#Zlib) (2)
-* [BSD 2-Clause &quot;Simplified&quot; License](#BSD-2-Clause) (1)
 * [Community Data License Agreement Permissive 2.0](#CDLA-Permissive-2.0) (1)
 * [GNU General Public License v3.0 or later](#GPL-3.0-or-later) (1)
 * [Mozilla Public License 2.0](#MPL-2.0) (1)
@@ -1314,13 +1313,10 @@ Apache License
 ### Apache License 2.0
 
 **Used by:**
-* [ab_glyph 0.2.32](https://github.com/alexheretic/ab-glyph)
-* [ab_glyph_rasterizer 0.1.10](https://github.com/alexheretic/ab-glyph)
 * [aws-lc-sys 0.41.0](https://github.com/aws/aws-lc-rs)
 * [dunce 1.0.5](https://gitlab.com/kornelski/dunce)
 * [gl_generator 0.14.0](https://github.com/brendanzab/gl-rs/)
 * [khronos_api 3.1.0](https://github.com/brendanzab/gl-rs/)
-* [owned_ttf_parser 0.25.1](https://github.com/alexheretic/owned-ttf-parser)
 * [sync_wrapper 1.0.2](https://github.com/Actyx/sync_wrapper)
 
 #### License Text
@@ -1401,42 +1397,6 @@ limitations under the License.
 
 ```
 
-### BSD 2-Clause &quot;Simplified&quot; License
-
-**Used by:**
-* [arrayref 0.3.9](https://github.com/droundy/arrayref)
-
-#### License Text
-```text
-Copyright (c) 2015 David Roundy &lt;roundyd@physics.oregonstate.edu&gt;
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the
-   distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-&quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-```
-
 ### BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License
 
 **Used by:**
@@ -1473,47 +1433,6 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-```
-
-### BSD 3-Clause &quot;New&quot; or &quot;Revised&quot; License
-
-**Used by:**
-* [tiny-skia-path 0.11.4](https://github.com/RazrFalcon/tiny-skia/tree/master/path)
-* [tiny-skia 0.11.4](https://github.com/RazrFalcon/tiny-skia)
-
-#### License Text
-```text
-Copyright (c) 2011 Google Inc. All rights reserved.
-Copyright (c) 2020 Yevhenii Reizner All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-  * Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
-
-  * Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in
-    the documentation and/or other materials provided with the
-    distribution.
-
-  * Neither the name of the copyright holder nor the names of its
-    contributors may be used to endorse or promote products derived
-    from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-&quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ```
@@ -1738,7 +1657,7 @@ insights.
 ### GNU General Public License v3.0 or later
 
 **Used by:**
-* [controlay 1.0.0](https://github.com/arounre/controlay)
+* [controlay 1.1.0](https://github.com/arounre/controlay)
 
 #### License Text
 ```text
@@ -3074,7 +2993,6 @@ DEALINGS IN THE SOFTWARE.
 * [wayland-cursor 0.31.14](https://github.com/smithay/wayland-rs)
 * [wayland-protocols-experimental 20250721.0.1](https://github.com/smithay/wayland-rs)
 * [wayland-protocols-misc 0.3.12](https://github.com/smithay/wayland-rs)
-* [wayland-protocols-plasma 0.3.12](https://github.com/smithay/wayland-rs)
 * [wayland-protocols-wlr 0.3.12](https://github.com/smithay/wayland-rs)
 * [wayland-protocols 0.32.12](https://github.com/smithay/wayland-rs)
 * [wayland-scanner 0.31.10](https://github.com/smithay/wayland-rs)
@@ -4437,7 +4355,6 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [smithay-client-toolkit 0.19.2](https://github.com/smithay/client-toolkit)
 * [smithay-client-toolkit 0.20.0](https://github.com/smithay/client-toolkit)
 
 #### License Text
@@ -4490,36 +4407,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
-```
-
-### MIT License
-
-**Used by:**
-* [ttf-parser 0.25.1](https://github.com/harfbuzz/ttf-parser)
-
-#### License Text
-```text
-Copyright (c) 2018 Yevhenii Reizner
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the &quot;Software&quot;), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
 
 ```
 
@@ -4968,7 +4855,7 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [tower-http 0.6.10](https://github.com/tower-rs/tower-http)
+* [tower-http 0.6.11](https://github.com/tower-rs/tower-http)
 
 #### License Text
 ```text
@@ -5236,7 +5123,7 @@ DEALINGS IN THE SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [local-ip-address 0.6.12](https://github.com/LeoBorai/local-ip-address)
+* [local-ip-address 0.6.13](https://github.com/LeoBorai/local-ip-address)
 
 #### License Text
 ```text
@@ -5265,35 +5152,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
-```
-
-### MIT License
-
-**Used by:**
-* [strict-num 0.1.1](https://github.com/RazrFalcon/strict-num)
-
-#### License Text
-```text
-Copyright (c) 2022 Yevhenii Reizner
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the &quot;Software&quot;), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 ```
 
@@ -5429,7 +5287,6 @@ SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [calloop-wayland-source 0.3.0](https://github.com/smithay/calloop-wayland-source)
 * [calloop-wayland-source 0.4.1](https://github.com/smithay/calloop-wayland-source)
 
 #### License Text
@@ -5656,7 +5513,7 @@ SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [num-conv 0.2.1](https://github.com/jhpratt/num-conv)
+* [num-conv 0.2.2](https://github.com/jhpratt/num-conv)
 
 #### License Text
 ```text
@@ -5911,41 +5768,6 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
 OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-```
-
-### MIT License
-
-**Used by:**
-* [as-raw-xcb-connection 1.0.1](https://github.com/psychon/as-raw-xcb-connection)
-
-#### License Text
-```text
-Copyright 2019 as-raw-xcb-connection Contributers
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the &quot;Software&quot;), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
 
 ```
 
@@ -6799,37 +6621,6 @@ SOFTWARE.
 ### MIT License
 
 **Used by:**
-* [sctk-adwaita 0.10.1](https://github.com/PolyMeilex/sctk-adwaita)
-
-#### License Text
-```text
-MIT License
-
-Copyright (c) 2022 Bartłomiej Maryńczak
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the &quot;Software&quot;), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-```
-
-### MIT License
-
-**Used by:**
 * [arboard 3.6.1](https://github.com/1Password/arboard)
 
 #### License Text
@@ -7506,7 +7297,6 @@ DEALINGS IN THE SOFTWARE.
 * [wasip2 1.0.3+wasi-0.2.9](https://github.com/bytecodealliance/wasi-rs)
 * [wit-bindgen 0.51.0](https://github.com/bytecodealliance/wit-bindgen)
 * [wit-bindgen 0.57.1](https://github.com/bytecodealliance/wit-bindgen)
-* [x11-dl 2.21.0](https://github.com/AltF02/x11-rs.git)
 * [x11 2.21.0](https://github.com/AltF02/x11-rs.git)
 * [zmij 1.0.21](https://github.com/dtolnay/zmij)
 * [zvariant_utils 3.3.1](https://github.com/z-galaxy/zbus/)
