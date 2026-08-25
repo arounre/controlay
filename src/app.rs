@@ -13,6 +13,9 @@ use crate::updater::UpdateInfo;
 
 const MAX_LOG_MESSAGES: usize = 25;
 
+/// Fallback inner size, and the floor we clamp to if eframe restores a tiny window.
+pub const WINDOW_MIN_INNER: [f32; 2] = [450.0, 350.0];
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct SlotState {
     pub info: AppInfo,
@@ -165,6 +168,18 @@ impl eframe::App for ControlayApp {
             ui.send_viewport_cmd(egui::ViewportCommand::Visible(false));
         }
 
+        // persist_window can restore 0x0 after tray-hide/minimize. Windows won't
+        // grow to min_inner_size until the user resizes, so clamp while visible.
+        // This it to combat an egui bug as of version 0.36.
+        if self.is_visible.load(Ordering::Relaxed) {
+            let min = egui::Vec2::from(WINDOW_MIN_INNER);
+            let size = ui.ctx().content_rect().size();
+            if size.x < min.x || size.y < min.y {
+                ui.ctx()
+                    .send_viewport_cmd(egui::ViewportCommand::InnerSize(min));
+            }
+        }
+
         match self.config.theme {
             ThemeMode::Dark => ui.ctx().set_visuals(egui::Visuals::dark()),
             ThemeMode::Light => ui.ctx().set_visuals(egui::Visuals::light()),
@@ -173,7 +188,7 @@ impl eframe::App for ControlayApp {
 
         self.handle_incoming_messages();
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             if self.show_driver_alert || self.show_update_alert {
                 ui.disable();
             }

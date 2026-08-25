@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use tokio::net::UdpSocket;
@@ -12,6 +12,7 @@ use vigem_rust::target::{DualShock4, Xbox360};
 
 use crate::config::{AppConfig, ControllerType, RawDeadzone};
 use crate::core::{AppEvent, AppInfo, ReceiverState, ServerCommand};
+use crate::debounce::ButtonDebouncer;
 use crate::discovery;
 use crate::protocol::{
     PKT_BATTERY, PKT_STATE, get_empty_ds4_report, get_empty_x360_report, parse_ds4_state,
@@ -136,6 +137,18 @@ async fn run_server(
         }
     };
 
+    // Fallback when no installer firewall rule exists (portable/dev builds):
+    // UDP alone often won't show the Windows allow-prompt. a TCP listen will.
+    let _firewall_prompt = match tokio::net::TcpListener::bind(("0.0.0.0", local_port)).await {
+        Ok(listener) => Some(listener),
+        Err(e) => {
+            let _ = event_tx.send(AppEvent::Log(format!(
+                "Could not open firewall prompt socket (inbound UDP may be blocked): {e}"
+            )));
+            None
+        }
+    };
+
     let _ = event_tx.send(AppEvent::ReceiverStateChanged(ReceiverState::On));
     let _ = event_tx.send(AppEvent::Log(format!("Listening on port {}", local_port)));
 
@@ -230,14 +243,15 @@ async fn run_controller_actor(
     let mut target: Option<ActiveTarget> = None;
     let mut is_active = false;
 
-    let mut current_profile = config_rx.borrow().profiles[slot_id as usize].clone();
+    let mut current_profile = config_rx.borrow().profiles[slot_id as usize];
     let mut raw_deadzone = RawDeadzone::from(current_profile.deadzone);
+    let mut button_debouncer = ButtonDebouncer::default();
 
     loop {
         tokio::select! {
             res = config_rx.changed() => {
                 if res.is_ok() {
-                    current_profile = config_rx.borrow().profiles[slot_id as usize].clone();
+                    current_profile = config_rx.borrow().profiles[slot_id as usize];
                     raw_deadzone = RawDeadzone::from(current_profile.deadzone);
                 } else {
                     break;
@@ -250,10 +264,11 @@ async fn run_controller_actor(
                             SlotMessage::Disconnect => {
                                 target.take();
                                 is_active = false;
+                                button_debouncer.reset();
 
                                 continue;
                             }
-                            SlotMessage::Data { len, buf: packet } => {
+                            SlotMessage::Data { len, buf: mut packet } => {
                                 if target.is_none() {
                                     match setup_controller(
                                         &client,
@@ -282,6 +297,16 @@ async fn run_controller_actor(
                                 if let Some(t) = &target {
                                     match packet[0] {
                                         PKT_STATE if len >= 12 => {
+                                            let buttons = u16::from_le_bytes([packet[2], packet[3]]);
+                                            let filtered = button_debouncer.apply(
+                                                buttons,
+                                                &current_profile.anti_double_click,
+                                                Instant::now(),
+                                            );
+                                            let filtered_bytes = filtered.to_le_bytes();
+                                            packet[2] = filtered_bytes[0];
+                                            packet[3] = filtered_bytes[1];
+
                                             match &t.handle {
                                                 TargetHandleEnum::Xbox(h) => { let _ = h.update(&parse_x360_state(&packet[2..], &raw_deadzone)); }
                                                 TargetHandleEnum::Ds4(h) => { let _ = h.update(&parse_ds4_state(&packet[2..], &raw_deadzone)); }
@@ -303,6 +328,7 @@ async fn run_controller_actor(
                     Err(_) => { // Timeout triggers organically when packets stop arriving
                         if is_active {
                             is_active = false;
+                            button_debouncer.reset();
 
                             let _ = event_tx.send(AppEvent::ControllerDisconnected(slot_id));
 
@@ -342,7 +368,7 @@ fn setup_controller(
 
             tokio::task::spawn_blocking(move || {
                 while !stop_flag.load(Ordering::Relaxed) {
-                    if let Ok(Ok(n)) = notif_rx.recv_timeout(Duration::from_millis(100)) {
+                    if let Ok(n) = notif_rx.recv_timeout(Duration::from_millis(100)) {
                         if let Some(addr) = *client_ip_rx.borrow() {
                             let strength = config_rx.borrow().profiles[slot_id as usize]
                                 .rumble_strength
@@ -363,9 +389,10 @@ fn setup_controller(
         ControllerType::X360 => {
             let target = client
                 .new_x360_target()
-                .plugin()
-                .context("Failed to plugin X360")?;
-            target.wait_for_ready().context("X360 not ready")?;
+                .plug()
+                .context("Failed to plug X360")?
+                .wait_for_ready()
+                .context("X360 not ready")?;
 
             spawn_rumble!(target);
 
@@ -377,9 +404,10 @@ fn setup_controller(
         ControllerType::DS4 => {
             let target = client
                 .new_ds4_target()
-                .plugin()
-                .context("Failed to plugin DS4")?;
-            target.wait_for_ready().context("DS4 not ready")?;
+                .plug()
+                .context("Failed to plug DS4")?
+                .wait_for_ready()
+                .context("DS4 not ready")?;
 
             spawn_rumble!(target);
 

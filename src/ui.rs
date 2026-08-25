@@ -1,7 +1,11 @@
 use crate::app::ControlayApp;
 use crate::app::Tab;
-use crate::config::ControllerType;
-use crate::config::ThemeMode;
+use crate::config::{
+    ANTI_DOUBLE_CLICK_WINDOW_MAX_MS, ANTI_DOUBLE_CLICK_WINDOW_MIN_MS, BTN_A, BTN_B, BTN_BACK,
+    BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT, BTN_DPAD_UP, BTN_GUIDE, BTN_LEFT_SHOULDER,
+    BTN_LEFT_THUMB, BTN_RIGHT_SHOULDER, BTN_RIGHT_THUMB, BTN_START, BTN_X, BTN_Y, ControllerType,
+    ThemeMode,
+};
 use crate::core::ReceiverState;
 use eframe::egui::{self, Ui};
 use egui::RichText;
@@ -39,9 +43,7 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui.label(
-                                        RichText::new(format!("P{}", i + 1))
-                                            .size(11.0)
-                                            .strong(),
+                                        RichText::new(format!("P{}", i + 1)).size(11.0).strong(),
                                     );
                                     ui.add_space(4.0);
 
@@ -103,7 +105,7 @@ pub fn draw_main_layout(app: &mut ControlayApp, ui: &mut Ui) {
         egui::Panel::bottom("update_footer")
             .show_separator_line(false)
             .frame(egui::Frame::NONE.inner_margin(egui::Margin::same(5)))
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
                         .link(RichText::new("New update available").small())
@@ -353,6 +355,79 @@ pub fn draw_settings_tab(app: &mut ControlayApp, ui: &mut Ui) {
                 }
             });
 
+            ui.add_space(10.0);
+
+            ui.label(RichText::new("Anti Double-Click (Live)").strong());
+            ui.indent("anti_double_click_indent", |ui| {
+                ui.add_space(5.0);
+
+                let r_enabled = ui.checkbox(
+                    &mut profile.anti_double_click.enabled,
+                    "Filter repeated presses",
+                );
+                if r_enabled.changed() {
+                    send_live_update = true;
+                }
+
+                ui.add_enabled_ui(profile.anti_double_click.enabled, |ui| {
+                    ui.add_space(5.0);
+
+                    if profile.anti_double_click.window_ms < ANTI_DOUBLE_CLICK_WINDOW_MIN_MS {
+                        profile.anti_double_click.window_ms = ANTI_DOUBLE_CLICK_WINDOW_MIN_MS;
+                    }
+
+                    let r_window = ui.add(
+                        egui::Slider::new(
+                            &mut profile.anti_double_click.window_ms,
+                            ANTI_DOUBLE_CLICK_WINDOW_MIN_MS..=ANTI_DOUBLE_CLICK_WINDOW_MAX_MS,
+                        )
+                        .integer()
+                        .suffix(" ms")
+                        .text("Window")
+                        .trailing_fill(true)
+                        .clamping(egui::SliderClamping::Always),
+                    );
+                    if r_window.drag_stopped() || r_window.lost_focus() {
+                        send_live_update = true;
+                    }
+
+                    ui.add_space(5.0);
+                    ui.label(RichText::new("Buttons").strong());
+                    ui.horizontal_wrapped(|ui| {
+                        for (bit, label) in [
+                            (BTN_DPAD_UP, "Up"),
+                            (BTN_DPAD_DOWN, "Down"),
+                            (BTN_DPAD_LEFT, "Left"),
+                            (BTN_DPAD_RIGHT, "Right"),
+                            (BTN_A, "A"),
+                            (BTN_B, "B"),
+                            (BTN_X, "X"),
+                            (BTN_Y, "Y"),
+                            (BTN_LEFT_SHOULDER, "LB"),
+                            (BTN_RIGHT_SHOULDER, "RB"),
+                            (BTN_LEFT_THUMB, "LS"),
+                            (BTN_RIGHT_THUMB, "RS"),
+                            (BTN_START, "Start"),
+                            (BTN_BACK, "Back"),
+                            (BTN_GUIDE, "Guide"),
+                        ] {
+                            if button_mask_toggle(ui, &mut profile.anti_double_click.buttons, bit, label)
+                            {
+                                send_live_update = true;
+                            }
+                        }
+                    });
+                });
+
+                ui.add_space(4.0);
+                ui.small(
+                    RichText::new(
+                        "Drops a second press of the same button if it arrives inside the window. Releases are never delayed. Keep the window below your tap speed so real mashing is not dropped.",
+                    )
+                    .weak(),
+                );
+            });
+
             ui.add_space(20.0);
 
             ui.label(
@@ -469,6 +544,17 @@ pub fn draw_about_tab(app: &mut ControlayApp, ui: &mut Ui) {
     });
 }
 
+fn button_mask_toggle(ui: &mut Ui, mask: &mut u16, bit: u16, label: &str) -> bool {
+    let selected = *mask & bit != 0;
+    let response = ui.add(egui::Button::new(label).selected(selected));
+    if response.clicked() {
+        *mask ^= bit;
+        true
+    } else {
+        false
+    }
+}
+
 fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str, is_active: bool) {
     let width = 24.0;
     let height = 12.0;
@@ -506,7 +592,7 @@ fn draw_battery_icon(ui: &mut Ui, percentage: i8, label: &str, is_active: bool) 
         painter.rect_stroke(
             body_rect,
             2.0,
-            egui::Stroke::new(1.0, stroke_color),
+            egui::Stroke::new(1.0f32, stroke_color),
             egui::StrokeKind::Inside,
         );
 

@@ -1,6 +1,6 @@
 [package]
 name = "controlay"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 authors = ["arounre"]
 description = "Receiver for Controlay: Emulate game controllers on PC using your Android phone as a wireless bridge."
@@ -13,33 +13,33 @@ keywords = ["controller", "emulation", "gaming", "network", "android"]
 categories = ["emulators", "hardware-support"]
 
 [dependencies]
-eframe = { version = "0.34.2", default-features = false, features = [
+eframe = { version = "0.36", default-features = false, features = [
     "persistence",
     "glow",
 ] }
-egui = "0.34.2"
-egui_commonmark = { version = "0.23.0", default-features = false }
-hostname = "0.4.2"
-local-ip-address = "0.6.13"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.149"
-tray-icon = "0.24.0"
-single-instance = "0.3.3"
-native-dialog = "0.9.6"
-reqwest = { version = "0.13.3", features = ["blocking", "json"] }
-semver = "1.0.28"
-anyhow = "1.0.102"
-notify-rust = "4.17.0"
-tokio = { version = "1.52.3", features = ["full"] }
+egui = "0.36"
+egui_commonmark = { version = "0.25", default-features = false }
+hostname = "0.4"
+local-ip-address = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tray-icon = "0.24"
+single-instance = "0.3"
+native-dialog = "0.9"
+reqwest = { version = "0.13", features = ["blocking", "json"] }
+semver = "1"
+anyhow = "1"
+notify-rust = "4"
+tokio = { version = "1", features = ["full"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-vigem-rust = "0.1.1"
+vigem-rust = "0.2"
 
 [build-dependencies]
-image = { version = "0.25.10", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
-winres = "0.1.12"
+winres = "0.1"
 
 
 [profile.release]
@@ -57,6 +57,27 @@ formats = ["nsis", "wix"]
 [[package.metadata.packager.binaries]]
 path = "controlay.exe"
 main = true
+
+# Inbound rule so the phone can send controller UDP to the PC.
+[package.metadata.packager.nsis]
+installer-mode = "perMachine"
+preinstall-section = """
+Section "Firewall"
+  ; Idempotent: drop any previous rule, then allow this install path.
+  ; un.Firewall below removes it on uninstall (same as WiX component).
+  ExecWait 'cmd /c netsh advfirewall firewall delete rule name="Controlay" >nul 2>&1'
+  ExecWait 'cmd /c netsh advfirewall firewall add rule name="Controlay" dir=in action=allow program="$INSTDIR\\${MAINBINARYNAME}.exe" enable=yes profile=any >nul 2>&1'
+SectionEnd
+
+Section "un.Firewall"
+  ExecWait 'cmd /c netsh advfirewall firewall delete rule name="Controlay" >nul 2>&1'
+SectionEnd
+"""
+
+[package.metadata.packager.wix]
+fragment-paths = ["packaging/wix/firewall.wxs"]
+component-refs = ["ControlayFirewall"]
+
 
 [package.metadata.release]
 publish = false

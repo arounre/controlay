@@ -1,5 +1,4 @@
-use vigem_rust::controller::ds4::Ds4SpecialButton;
-use vigem_rust::{Ds4Button, Ds4Dpad, Ds4Report, X360Button, X360Report};
+use vigem_rust::{Ds4ButtonFlags, Ds4Dpad, Ds4Report, Ds4SpecialButton, X360Button, X360Report};
 
 use crate::config::RawDeadzone;
 
@@ -18,7 +17,7 @@ pub fn get_empty_x360_report() -> X360Report {
 
 pub fn get_empty_ds4_report() -> Ds4Report {
     let mut report = Ds4Report::default();
-    
+
     // Neutral stick positions are 128 for ds4
     report.thumb_lx = 128;
     report.thumb_ly = 128;
@@ -33,43 +32,44 @@ pub fn parse_ds4_state(data: &[u8], deadzone: &RawDeadzone) -> Ds4Report {
     let mut gamepad = Ds4Report::default();
     let x360 = X360Button::from_bits_retain(u16::from_le_bytes([data[0], data[1]]));
 
-    let mut ds4_btns = Ds4Button::empty();
+    let mut ds4_btns = Ds4ButtonFlags::empty();
 
     if x360.contains(X360Button::A) {
-        ds4_btns |= Ds4Button::CROSS;
+        ds4_btns |= Ds4ButtonFlags::CROSS;
     }
     if x360.contains(X360Button::B) {
-        ds4_btns |= Ds4Button::CIRCLE;
+        ds4_btns |= Ds4ButtonFlags::CIRCLE;
     }
     if x360.contains(X360Button::X) {
-        ds4_btns |= Ds4Button::SQUARE;
+        ds4_btns |= Ds4ButtonFlags::SQUARE;
     }
     if x360.contains(X360Button::Y) {
-        ds4_btns |= Ds4Button::TRIANGLE;
+        ds4_btns |= Ds4ButtonFlags::TRIANGLE;
     }
     if x360.contains(X360Button::LEFT_SHOULDER) {
-        ds4_btns |= Ds4Button::SHOULDER_LEFT;
+        ds4_btns |= Ds4ButtonFlags::SHOULDER_LEFT;
     }
     if x360.contains(X360Button::RIGHT_SHOULDER) {
-        ds4_btns |= Ds4Button::SHOULDER_RIGHT;
+        ds4_btns |= Ds4ButtonFlags::SHOULDER_RIGHT;
     }
     if x360.contains(X360Button::LEFT_THUMB) {
-        ds4_btns |= Ds4Button::THUMB_LEFT;
+        ds4_btns |= Ds4ButtonFlags::THUMB_LEFT;
     }
     if x360.contains(X360Button::RIGHT_THUMB) {
-        ds4_btns |= Ds4Button::THUMB_RIGHT;
+        ds4_btns |= Ds4ButtonFlags::THUMB_RIGHT;
     }
     if x360.contains(X360Button::START) {
-        ds4_btns |= Ds4Button::OPTIONS;
+        ds4_btns |= Ds4ButtonFlags::OPTIONS;
     }
     if x360.contains(X360Button::BACK) {
-        ds4_btns |= Ds4Button::SHARE;
+        ds4_btns |= Ds4ButtonFlags::SHARE;
     }
 
-    gamepad.buttons = ds4_btns.bits();
+    // Ds4Buttons preserves the D-pad nibble when OR-ing flag bits.
+    gamepad.buttons |= ds4_btns;
 
     if x360.contains(X360Button::GUIDE) {
-        gamepad.special = Ds4SpecialButton::PS.bits();
+        gamepad.special |= Ds4SpecialButton::PS;
     }
 
     gamepad.set_dpad(
@@ -91,8 +91,8 @@ pub fn parse_ds4_state(data: &[u8], deadzone: &RawDeadzone) -> Ds4Report {
         },
     );
 
-    gamepad.trigger_l = data[2];
-    gamepad.trigger_r = data[3];
+    gamepad.trigger_left = data[2];
+    gamepad.trigger_right = data[3];
 
     gamepad.thumb_lx = scale_axis(
         deadzone.apply(i16::from_le_bytes([data[4], data[5]])),
