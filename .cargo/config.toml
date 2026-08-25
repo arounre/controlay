@@ -1,2 +1,6 @@
 [alias]
-update-thirdparty =["about", "generate", "-o", "thirdparty.md", "about.hbs"]
+update-thirdparty = ["about", "generate", "-o", "thirdparty.md", "about.hbs"]
+
+pack = ["packager", "--release"]
+pack-nsis = ["packager", "--release", "--formats", "nsis"]
+pack-msi = ["packager", "--release", "--formats", "wix"]

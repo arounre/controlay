@@ -30,12 +30,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # Packager runs on the x64 runner for both targets; it only needs the
+      # already-built binary under target/<triple>/release/.
       - name: Install cargo-binstall
-        if: matrix.arch_name == 'x86_64'
         uses: taiki-e/install-action@cargo-binstall
 
       - name: Install cargo-packager
-        if: matrix.arch_name == 'x86_64'
         run: cargo binstall -y cargo-packager
 
       - name: Get Project Name
@@ -46,26 +46,29 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Create Installers
-        if: matrix.arch_name == 'x86_64'
         run: cargo packager --release --target ${{ matrix.target }}
 
       - name: Process Artifacts
         shell: bash
         run: |
-          # Define standard names
           RAW_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}.exe"
           SETUP_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}-setup.exe"
           MSI_NAME="${PROJECT_NAME}-${{ github.ref_name }}-windows-${{ matrix.arch_name }}.msi"
 
-          # A. Handle Raw Binary (Always exists)
           cp "target/${{ matrix.target }}/release/${PROJECT_NAME}.exe" "./$RAW_NAME"
 
-          # B. Handle Installers (Only exists for x86_64)
-          find target -name "*.msi" -exec cp {} "./$MSI_NAME" \;
-          find target -name "*setup.exe" -exec cp {} "./$SETUP_NAME" \;
+          # Prefer the packager output for this target triple when present.
+          find "target/${{ matrix.target }}" -name "*.msi" -exec cp {} "./$MSI_NAME" \; 2>/dev/null || true
+          find "target/${{ matrix.target }}" -name "*setup.exe" -exec cp {} "./$SETUP_NAME" \; 2>/dev/null || true
+          # Fallback: some packager versions write next to the host release dir.
+          if [[ ! -f "./$MSI_NAME" ]]; then
+            find target -name "*.msi" -exec cp {} "./$MSI_NAME" \;
+          fi
+          if [[ ! -f "./$SETUP_NAME" ]]; then
+            find target -name "*setup.exe" -exec cp {} "./$SETUP_NAME" \;
+          fi
 
-          # Debug check
-          ls -lh *-${{ matrix.arch_name }}*.exe *.msi || true
+          ls -lh *-${{ matrix.arch_name }}* || true
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -76,7 +79,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-*-${{ matrix.arch_name }}-setup.exe
             ${{ env.PROJECT_NAME }}-*-${{ matrix.arch_name }}.msi
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: error
 
   release-and-scan:
     name: Release & VirusTotal
@@ -85,17 +88,11 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-
-      - name: Inspect Downloaded Files
-        run: ls -R dist
 
       - name: Attest Release Artifacts
         if: github.event.repository.private == false
@@ -109,7 +106,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: "dist/*"
           allowUpdates: true
-          generateReleaseNotes: true
+          omitBody: true
+          omitBodyDuringUpdate: true
           makeLatest: true
 
       - name: VirusTotal Scan

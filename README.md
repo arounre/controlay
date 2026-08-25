@@ -48,7 +48,7 @@ Many PCs (especially desktops or older laptops) lack built-in Bluetooth support,
 ## Features
 - **Broad Controller Compatibility**: Likely (🤞) to work with most Bluetooth controllers that are able to pair with Android devices.
 - **Flexible Emulation Modes**: Choose to emulate a PlayStation 4 DualShock 4 or Xbox 360 (XInput) controller on the PC side for maximum game compatibility.
-- **Seamless Local Network Connection**: Connecting your phone to your PC is effortless and requires no manual configuration. Simply ensure both devices are on the same Wi-Fi network, select your PC from the app, and tap "Start Relay." Please note that latency and performance depend on the quality of your Wi-Fi environment.
+- **Seamless Local Network Connection**: Connecting your phone to your PC is effortless and requires no manual configuration. Simply ensure both devices are on the same Wi-Fi network, select your PC from the app, and tap "Start Relay." There's no pairing handshake yet, so use it on a Wi-Fi you trust (e.g. home), not a public hotspot. Latency and performance depend on the quality of your Wi-Fi environment.
 
 ## Usage
 Follow these steps to set up the system.
@@ -75,7 +75,7 @@ Follow these steps to set up the system.
 
 ## System Requirements
 *   **OS:** Windows 10 or Windows 11 (64-bit or ARM64).
-*   **Network:** PC and Android device must be on the same local network.
+*   **Network:** PC and Android device on the same trusted local Wi-Fi (no pairing handshake yet).
 *   **Driver:** [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases).
 
 ## Troubleshooting

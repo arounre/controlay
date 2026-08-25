@@ -81,12 +81,58 @@ pub enum ThemeMode {
     Dark,
 }
 
+// XInput / Xbox 360 digital bits. Matches the wire protocol and ViGEm X360Button.
+pub const BTN_DPAD_UP: u16 = 0x0001;
+pub const BTN_DPAD_DOWN: u16 = 0x0002;
+pub const BTN_DPAD_LEFT: u16 = 0x0004;
+pub const BTN_DPAD_RIGHT: u16 = 0x0008;
+pub const BTN_START: u16 = 0x0010;
+pub const BTN_BACK: u16 = 0x0020;
+pub const BTN_LEFT_THUMB: u16 = 0x0040;
+pub const BTN_RIGHT_THUMB: u16 = 0x0080;
+pub const BTN_LEFT_SHOULDER: u16 = 0x0100;
+pub const BTN_RIGHT_SHOULDER: u16 = 0x0200;
+pub const BTN_GUIDE: u16 = 0x0400;
+pub const BTN_A: u16 = 0x1000;
+pub const BTN_B: u16 = 0x2000;
+pub const BTN_X: u16 = 0x4000;
+pub const BTN_Y: u16 = 0x8000;
+
+pub const BTN_DPAD_ALL: u16 = BTN_DPAD_UP | BTN_DPAD_DOWN | BTN_DPAD_LEFT | BTN_DPAD_RIGHT;
+
+pub const ANTI_DOUBLE_CLICK_WINDOW_DEFAULT_MS: u16 = 50;
+pub const ANTI_DOUBLE_CLICK_WINDOW_MIN_MS: u16 = 10;
+pub const ANTI_DOUBLE_CLICK_WINDOW_MAX_MS: u16 = 150;
+
+/// Per-button rising-edge cooldown. A second press of the same selected button
+/// inside `window_ms` is dropped. releases are never delayed.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(default)]
+pub struct AntiDoubleClickConfig {
+    pub enabled: bool,
+    pub window_ms: u16,
+    /// Bitmask of buttons to filter (same bits as the state packet).
+    pub buttons: u16,
+}
+
+impl Default for AntiDoubleClickConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            window_ms: ANTI_DOUBLE_CLICK_WINDOW_DEFAULT_MS,
+            buttons: BTN_DPAD_ALL,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ControllerProfile {
     pub controller_type: ControllerType,
     pub deadzone: DeadzoneConfig,
     pub rumble_strength: f32,
+    #[serde(default)]
+    pub anti_double_click: AntiDoubleClickConfig,
 }
 
 impl Default for ControllerProfile {
@@ -95,6 +141,7 @@ impl Default for ControllerProfile {
             controller_type: ControllerType::X360,
             deadzone: DeadzoneConfig::default(),
             rumble_strength: 100.0,
+            anti_double_click: AntiDoubleClickConfig::default(),
         }
     }
 }

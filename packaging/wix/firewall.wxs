@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?if $(sys.BUILDARCH)="x86"?>
+    <?define Win64 = "no" ?>
+<?else?>
+    <?define Win64 = "yes" ?>
+<?endif?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:fire="http://schemas.microsoft.com/wix/FirewallExtension">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="ControlayFirewall" Guid="8F3C2A91-4B6E-4D17-9C5A-1E7B0D4F2A63" Win64="$(var.Win64)">
+        <fire:FirewallException
+          Id="ControlayInbound"
+          Name="Controlay"
+          Description="Allow Controlay to receive controller input from your phone"
+          File="Path"
+          Scope="any"
+          IgnoreFailure="yes" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\arounre\Controlay"
+          Name="FirewallException"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

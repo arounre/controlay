@@ -22,6 +22,7 @@ use crate::{
 mod app;
 mod config;
 pub mod core;
+mod debounce;
 mod discovery;
 mod licenses;
 mod logic;
@@ -103,9 +104,12 @@ fn run_app() -> Result<()> {
     });
 
     let native_options = eframe::NativeOptions {
-        renderer: eframe::Renderer::Glow, // default backend (wgpu) had some memory leak issues, might be fixed by now
+        // wgpu is eframe's default. Stay on glow: smaller binary, and it avoids
+        // the still-open Windows multi-monitor/DPI leak (emilk/egui#4674).
+        renderer: eframe::Renderer::Glow,
         viewport: egui::ViewportBuilder::default()
-            .with_min_inner_size([450.0, 350.0])
+            .with_inner_size(app::WINDOW_MIN_INNER)
+            .with_min_inner_size(app::WINDOW_MIN_INNER)
             .with_icon(egui::IconData {
                 rgba: icon_rgba.clone(),
                 width: ICON_WIDTH,
