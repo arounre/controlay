@@ -15,12 +15,17 @@ jobs:
     name: Build ${{ matrix.arch_name }}
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-pc-windows-msvc
             arch_name: x86_64
+            packager_formats: nsis,wix
           - target: aarch64-pc-windows-msvc
             arch_name: arm64
+            # cargo-packager's WiX template errors on ARM64 BUILDARCH
+            # (`Unsupported value of sys.BUILDARCH`). NSIS is fine.
+            packager_formats: nsis
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +51,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Create Installers
-        run: cargo packager --release --target ${{ matrix.target }}
+        run: cargo packager --release --target ${{ matrix.target }} --formats ${{ matrix.packager_formats }}
 
       - name: Process Artifacts
         shell: bash
